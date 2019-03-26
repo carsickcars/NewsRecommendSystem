@@ -1,24 +1,19 @@
 package top.qianxinyao.dbconnection;
 
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import com.jfinal.plugin.activerecord.ActiveRecordPlugin;
+import com.jfinal.plugin.c3p0.C3p0Plugin;
+import org.apache.log4j.Logger;
+import org.apache.mahout.cf.taste.impl.model.jdbc.MySQLBooleanPrefJDBCDataModel;
+import top.qianxinyao.model.*;
+
+import javax.sql.DataSource;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Properties;
-
-import javax.sql.DataSource;
-
-import org.apache.log4j.Logger;
-import org.apache.mahout.cf.taste.impl.model.jdbc.MySQLBooleanPrefJDBCDataModel;
-
-import com.jfinal.plugin.activerecord.ActiveRecordPlugin;
-import com.jfinal.plugin.c3p0.C3p0Plugin;
-
-import top.qianxinyao.model.News;
-import top.qianxinyao.model.Newslogs;
-import top.qianxinyao.model.Newsmodules;
-import top.qianxinyao.model.Recommendations;
-import top.qianxinyao.model.Users;
 
 public class DBKit{
 	
@@ -41,6 +36,7 @@ public class DBKit{
 	{
 		try
 		{
+			ssh(); //连接数据库之前先连接一下ssh。
 			HashMap<String, String> info = getDBInfo();
 			cp = new C3p0Plugin(info.get("url"), info.get("user"), info.get("password"));
 			
@@ -79,6 +75,11 @@ public class DBKit{
 			info.put("url", p.getProperty("url"));
 			info.put("user", p.getProperty("user"));
 			info.put("password", p.getProperty("password"));
+
+			info.put("sshhost",p.getProperty("sshhost"));
+			info.put("sshuser",p.getProperty("sshuser"));
+			info.put("sshpwd",p.getProperty("sshpwd"));
+			info.put("sshport",p.getProperty("sshport"));
 		}
 		catch (FileNotFoundException e)
 		{
@@ -100,5 +101,28 @@ public class DBKit{
 	public static MySQLBooleanPrefJDBCDataModel getMySQLJDBCDataModel(){
 	return new MySQLBooleanPrefJDBCDataModel(DBKit.getDataSource(), PREF_TABLE, PREF_TABLE_USERID,
 		PREF_TABLE_NEWSID,PREF_TABLE_TIME);
+	}
+
+
+	public static void ssh(){
+		try {
+			HashMap<String, String> info = getDBInfo();
+			String sshUser=info.get("sshuser");
+			String sshHost=info.get("sshhost");
+			String sshPwd=info.get("sshpwd");
+			Integer sshPort=Integer.valueOf(info.get("sshport"));
+
+			JSch jsch = new JSch();
+			Session session = jsch.getSession(sshUser, sshHost, sshPort);
+			session.setPassword(sshPwd);
+			session.setConfig("StrictHostKeyChecking", "no");
+			session.connect();
+			System.out.println(session.getServerVersion());//这里打印SSH服务器版本信息
+
+			int assinged_port = session.setPortForwardingL(3307, "localhost", 3306);//端口映射 转发
+			System.out.println("localhost:" + assinged_port);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }
